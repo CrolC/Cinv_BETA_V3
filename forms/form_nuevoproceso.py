@@ -344,25 +344,25 @@ class FormNuevoProceso(ctk.CTkFrame):
                     campo.configure(state="normal" if estado else "disabled")
 
     def validar_entrada(self, text):
-        """Validación de entrada numérica"""
+        """Validación de entrada numérica - ahora permite hasta 5 dígitos (99999)"""
         if text == "":
             return True
         if text.isdigit():
             try:
                 val = int(text)
-                return val <= 9999
+                return val <= 99999  # Cambiado de 9999 a 99999
             except:
                 return False
         return False
 
     def validar_tiempo(self, entry, unidad_menu):
-        """Validación de tiempo de apertura/cierre"""
+        """Validación de tiempo de apertura/cierre - ahora permite hasta 99999 segundos"""
         try:
             valor = float(entry.get()) if entry.get() else 0
             unidad = unidad_menu.get()
             segundos = self.convertir_a_segundos(valor, unidad)
 
-            if segundos > 9999:
+            if segundos > 99999:  # Cambiado de 9999 a 99999
                 entry.configure(border_color="red")
             else:
                 entry.configure(border_color="gray")
@@ -376,7 +376,7 @@ class FormNuevoProceso(ctk.CTkFrame):
         btn_der.configure(fg_color="#06918A" if seleccion == "D" else "#D3D3D3")
 
     def convertir_a_segundos(self, valor, unidad):
-        """Conversión de unidades de tiempo a segundos"""
+        """Conversión de unidades de tiempo a segundos - ahora permite hasta 99999 segundos"""
         try:
             valor = float(valor)
             if unidad == "min":
@@ -421,7 +421,7 @@ class FormNuevoProceso(ctk.CTkFrame):
             # Config de apertura
             apertura_frame = ctk.CTkFrame(fila)
             apertura_frame.pack(side="left", padx=5)
-            apertura = ctk.CTkEntry(apertura_frame, width=50, validate="key", 
+            apertura = ctk.CTkEntry(apertura_frame, width=60, validate="key",  # Aumentado ancho para 5 dígitos
                                  validatecommand=(self.validar_cmd, "%P"), state="disabled", fg_color="#e0e0e0")
             apertura.pack(side="left")
             apertura_unidad = ctk.CTkOptionMenu(apertura_frame, values=["s", "min", "h"], width=50, state="disabled")
@@ -435,7 +435,7 @@ class FormNuevoProceso(ctk.CTkFrame):
             # Config de cierre
             cierre_frame = ctk.CTkFrame(fila)
             cierre_frame.pack(side="left", padx=5)
-            cierre = ctk.CTkEntry(cierre_frame, width=50, validate="key", 
+            cierre = ctk.CTkEntry(cierre_frame, width=60, validate="key",  # Aumentado ancho para 5 dígitos
                                 validatecommand=(self.validar_cmd, "%P"), state="disabled", fg_color="#e0e0e0")
             cierre.pack(side="left")
             cierre_unidad = ctk.CTkOptionMenu(cierre_frame, values=["s", "min", "h"], width=50, state="disabled")
@@ -665,510 +665,254 @@ class FormNuevoProceso(ctk.CTkFrame):
                         'ciclos': 0,
                         'estado': 'A',
                         'fase': fase_global_idx + 1,
-                        'tipo_proceso': 'complejo'
+                        'tipo_proceso': 'fase_inicio'
                     }
                     self.guardar_proceso_db(datos_fase)
                     
-                    # Ejecutar válvulas activas en esta fase
+                    # Esperar hasta que la fase sea completada por la ESP32
                     while not fase_completada and self.proceso_en_ejecucion:
-                        # Manejar pausa
-                        while self.proceso_pausado and self.proceso_en_ejecucion:
-                            if self.tiempo_pausa == 0:
-                                self.tiempo_pausa = time.time()
-                                datos_pausa = {
-                                    'proceso_id': self.proceso_id,
-                                    'fecha_inicio': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                                    'fecha_fin': '',
-                                    'hora_instruccion': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                                    'valvula': "Pausa",
-                                    'tiempo': 0,
-                                    'ciclos': 0,
-                                    'estado': 'P',
-                                    'fase': fase_global_idx + 1,
-                                    'tipo_proceso': 'complejo'
-                                }
-                                self.guardar_proceso_db(datos_pausa)
-                            time.sleep(0.1)
+                        time.sleep(0.1)  # Pequeña pausa para no saturar
                         
-                        if not self.proceso_en_ejecucion:
-                            break
-                            
-                        if self.tiempo_pausa > 0:
-                            self.tiempo_inicio_fase += time.time() - self.tiempo_pausa
-                            self.tiempo_pausa = 0
-                            datos_reanudar = {
-                                'proceso_id': self.proceso_id,
-                                'fecha_inicio': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                                'fecha_fin': '',
-                                'hora_instruccion': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                                'valvula': "Reanudar",
-                                'tiempo': 0,
-                                'ciclos': 0,
-                                'estado': 'R',
-                                'fase': fase_global_idx + 1,
-                                'tipo_proceso': 'complejo'
-                            }
-                            self.guardar_proceso_db(datos_reanudar)
-                        
-                        tiempo_transcurrido_fase = time.time() - self.tiempo_inicio_fase
-                        fase_completada = True
-                        
-                        for valvula_idx, valvula in enumerate(valvulas):
-                            key = f"R{repeticion}F{fase_idx+1}V{valvula_idx+1}"
-                            if key in self.valvulas_activas:
-                                config = self.valvulas_activas[key]
-                                
-                                if config['ciclos_totales'] > 0:
-                                    ciclos_completos = min(
-                                        int(tiempo_transcurrido_fase / config['tiempo_ciclo']),
-                                        config['ciclos_totales']
-                                    )
-                                    
-                                    if ciclos_completos > config['ciclos_completados']:
-                                        config['ciclos_completados'] = ciclos_completos
-                                        valvula['progreso'].configure(text=f"{ciclos_completos}/{config['ciclos_totales']}")
-                                        self.agregar_notificacion(f"Válvula {config['elemento']}: Ciclo {ciclos_completos}/{config['ciclos_totales']}")
-                                        
-                                        datos_ciclo = {
-                                            'proceso_id': self.proceso_id,
-                                            'fecha_inicio': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                                            'fecha_fin': '',
-                                            'hora_instruccion': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                                            'valvula': config['elemento'],
-                                            'tiempo': config['tiempo_ciclo'],
-                                            'ciclos': ciclos_completos,
-                                            'estado': 'A',
-                                            'fase': fase_global_idx + 1,
-                                            'tipo_proceso': 'cíclico'
-                                        }
-                                        self.guardar_proceso_db(datos_ciclo)
-                                    
-                                    if config['ciclos_completados'] < config['ciclos_totales']:
-                                        fase_completada = False
-                                else:
-                                    if tiempo_transcurrido_fase < config['tiempo_ciclo']:
-                                        tiempo_restante = max(0, config['tiempo_ciclo'] - tiempo_transcurrido_fase)
-                                        valvula['progreso'].configure(text=f"T: {int(tiempo_restante)}s")
-                                        fase_completada = False
-                                    else:
-                                        valvula['progreso'].configure(text="Completado")
-                                        self.agregar_notificacion(f"Válvula {config['elemento']}: Tiempo completado")
-                                        
-                                        datos_fin_valvula = {
-                                            'proceso_id': self.proceso_id,
-                                            'fecha_inicio': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                                            'fecha_fin': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                                            'hora_instruccion': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                                            'valvula': config['elemento'],
-                                            'tiempo': config['tiempo_ciclo'],
-                                            'ciclos': 0,
-                                            'estado': 'C',
-                                            'fase': fase_global_idx + 1,
-                                            'tipo_proceso': 'puntual'
-                                        }
-                                        self.guardar_proceso_db(datos_fin_valvula)
-                        
-                        time.sleep(0.1)
+                        # Verificar si hay pausa
+                        if self.proceso_pausado:
+                            tiempo_pausa_inicio = time.time()
+                            while self.proceso_pausado and self.proceso_en_ejecucion:
+                                time.sleep(0.1)
+                            if self.proceso_en_ejecucion:
+                                self.tiempo_pausa += time.time() - tiempo_pausa_inicio
                     
-                    if fase_completada:
-                        self.agregar_notificacion(f"Fase {nombre_fase} (Repetición {repeticion+1}) completada")
-                        datos_fin_fase = {
-                            'proceso_id': self.proceso_id,
-                            'fecha_inicio': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                            'fecha_fin': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                            'hora_instruccion': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                            'valvula': f"Fin fase {fase_idx+1} (Rep {repeticion+1})",
-                            'tiempo': 0,
-                            'ciclos': 0,
-                            'estado': 'C',
-                            'fase': fase_global_idx + 1,
-                            'tipo_proceso': 'complejo'
-                        }
-                        self.guardar_proceso_db(datos_fin_fase)
-            
+                    # Registrar fin de fase en la base de datos
+                    datos_fase_fin = {
+                        'proceso_id': self.proceso_id,
+                        'fecha_inicio': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                        'fecha_fin': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                        'hora_instruccion': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                        'valvula': f"Fin fase {fase_idx+1} (Rep {repeticion+1})",
+                        'tiempo': time.time() - self.tiempo_inicio_fase - self.tiempo_pausa,
+                        'ciclos': 0,
+                        'estado': 'C',
+                        'fase': fase_global_idx + 1,
+                        'tipo_proceso': 'fase_fin'
+                    }
+                    self.guardar_proceso_db(datos_fase_fin)
+                    
+                    self.tiempo_pausa = 0  # Resetear tiempo de pausa
+                    
+            # Proceso completado
             if self.proceso_en_ejecucion:
                 self.agregar_notificacion("Proceso completado exitosamente")
-                messagebox.showinfo("Éxito", "El proceso se ha completado correctamente")
                 
-                fecha_fin = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                conn = sqlite3.connect("procesos.db")
-                cursor = conn.cursor()
-                cursor.execute("""
-                    UPDATE procesos 
-                    SET fecha_fin=?, estado_valvula='C'
-                    WHERE proceso_id=? AND fecha_fin=''
-                """, (fecha_fin, self.proceso_id))
-                
-                datos_fin_proceso = {
+                # Registrar fin de proceso en la base de datos
+                datos_fin = {
                     'proceso_id': self.proceso_id,
                     'fecha_inicio': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    'fecha_fin': fecha_fin,
+                    'fecha_fin': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                     'hora_instruccion': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    'valvula': "Fin proceso",
-                    'tiempo': 0,
+                    'valvula': f"Proceso completado (Repeticiones: {repeticiones})",
+                    'tiempo': time.time() - self.tiempo_inicio_fase - self.tiempo_pausa,
                     'ciclos': 0,
                     'estado': 'C',
-                    'fase': 999,
-                    'tipo_proceso': 'complejo'
+                    'fase': 0,
+                    'tipo_proceso': 'completo'
                 }
+                self.guardar_proceso_db(datos_fin)
                 
-                cursor.execute('''INSERT INTO procesos 
-                    (user_id, proceso_id, fecha_inicio, fecha_fin, hora_instruccion, 
-                        valvula_activada, tiempo_valvula, ciclos, estado_valvula, fase, tipo_proceso)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-                    (self.user_id,
-                    datos_fin_proceso['proceso_id'],
-                    datos_fin_proceso['fecha_inicio'],
-                    datos_fin_proceso['fecha_fin'],
-                    datos_fin_proceso['hora_instruccion'],
-                    datos_fin_proceso['valvula'],
-                    datos_fin_proceso['tiempo'],
-                    datos_fin_proceso['ciclos'],
-                    datos_fin_proceso['estado'],
-                    datos_fin_proceso['fase'],
-                    datos_fin_proceso['tipo_proceso']))
-                
-                conn.commit()
-                conn.close()
-            
-            self.proceso_en_ejecucion = False
-            self.pausar_btn.configure(state="disabled")
-            self.ejecutar_btn.configure(state="normal")
-            self.master_panel.liberar_bloqueo_hardware()
+                messagebox.showinfo("Éxito", "Proceso completado exitosamente")
             
         except Exception as e:
-            fecha_fin = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            conn = sqlite3.connect("procesos.db")
-            cursor = conn.cursor()
-            cursor.execute("""
-                UPDATE procesos 
-                SET fecha_fin=?, estado_valvula='E'
-                WHERE proceso_id=? AND fecha_fin=''
-            """, (fecha_fin, self.proceso_id))
-            
-            datos_error = {
-                'proceso_id': self.proceso_id,
-                'fecha_inicio': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                'fecha_fin': fecha_fin,
-                'hora_instruccion': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                'valvula': "Error",
-                'tiempo': 0,
-                'ciclos': 0,
-                'estado': 'E',
-                'fase': 999,
-                'tipo_proceso': 'complejo'
-            }
-            
-            cursor.execute('''INSERT INTO procesos 
-                (user_id, proceso_id, fecha_inicio, fecha_fin, hora_instruccion, 
-                    valvula_activada, tiempo_valvula, ciclos, estado_valvula, fase, tipo_proceso)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-                (self.user_id,
-                datos_error['proceso_id'],
-                datos_error['fecha_inicio'],
-                datos_error['fecha_fin'],
-                datos_error['hora_instruccion'],
-                datos_error['valvula'],
-                datos_error['tiempo'],
-                datos_error['ciclos'],
-                datos_error['estado'],
-                datos_error['fase'],
-                datos_error['tipo_proceso']))
-            
-            conn.commit()
-            conn.close()
-            
+            error_msg = f"Error en ejecución: {str(e)}"
+            self.agregar_notificacion(error_msg)
+            messagebox.showerror("Error", error_msg)
+        finally:
             self.proceso_en_ejecucion = False
-            self.pausar_btn.configure(state="disabled")
+            self.proceso_pausado = False
+            self.pausar_btn.configure(state="disabled", text="Pausar Rutina")
             self.ejecutar_btn.configure(state="normal")
             self.master_panel.liberar_bloqueo_hardware()
-            self.agregar_notificacion(f"Error en ejecución: {str(e)}")
-            messagebox.showerror("Error", f"Ocurrió un error durante la ejecución: {str(e)}")
-
-    def enviar_cadena_serial(self, repeticiones):
-        """Send command to ESP32 with validation for repeated phases"""
-        try:
-            if not hasattr(self.master_panel, 'serial_connection') or not self.master_panel.serial_connection:
-                messagebox.showerror("Error", "No hay conexión con la ESP32")
-                return False
-                
-            if not self.master_panel.verificar_ejecucion("nuevoproceso"):
-                return False
-                
-            fecha_actual = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            cadenas_fases = []
-            
-            # Build command for each phase
-            for fase_idx, (nombre_fase, valvulas) in enumerate(self.fases_datos.items(), start=1):
-                cadenas = []
-                for valvula_idx, valvula in enumerate(valvulas, start=1):
-                    if valvula['switch'].get():
-                        tiempo = self.convertir_a_segundos(
-                            valvula['apertura'].get(), 
-                            valvula['apertura_unidad'].get()
-                        )
-                        ciclos = valvula['ciclos'].get() if valvula['ciclos'].get() else 0
-                        
-                        # Validate times
-                        if tiempo > 9999:
-                            messagebox.showerror(
-                                "Error", 
-                                f"Tiempo para {valvula['elemento']} excede el máximo (9999 segundos)"
-                            )
-                            return False
-                            
-                        # Build command string
-                        motor = f"M{valvula_idx}"
-                        ciclos_val = str(ciclos).zfill(4) if ciclos else "0000"
-                        cierre_val = self.convertir_a_segundos(
-                            valvula['cierre'].get(), 
-                            valvula['cierre_unidad'].get()
-                        )
-                        
-                        apertura_str = str(min(tiempo, 9999)).zfill(4)
-                        cierre_str = str(min(cierre_val, 9999)).zfill(4)
-
-                        # Determine task type
-                        if int(ciclos_val) > 0:
-                            tarea = "B"  # Cyclic mode
-                        elif tiempo > 0:
-                            tarea = "C"  # Timed open/close
-                        elif valvula['switch'].get() and tiempo == 0:
-                            tarea = "A"  # Simple open
-                        else:
-                            tarea = "E"  # Error
-
-                        cadena = f"{motor}{tarea}N{ciclos_val}{apertura_str}{cierre_str}"
-                        
-                        # Validate command length
-                        if len(cadena) > 20:  # Per valve limit
-                            messagebox.showerror(
-                                "Error", 
-                                f"Comando para {valvula['elemento']} es demasiado largo"
-                            )
-                            return False
-                            
-                        cadenas.append(cadena)
-                
-                if cadenas:
-                    fase_cadena = "".join(cadenas)
-                    if len(fase_cadena) > 161:  # Per phase limit
-                        messagebox.showerror(
-                            "Error", 
-                            f"Comando para fase {nombre_fase} es demasiado largo"
-                        )
-                        return False
-                    cadenas_fases.append(fase_cadena)
-
-            # Join all phases with repetitions
-            cadena_final = ""
-            for _ in range(repeticiones):
-                cadena_final += "&".join(cadenas_fases) if cadenas_fases else ""
-                cadena_final += "&"  # Add separator between repetitions
-            
-            # Remove last separator
-            cadena_final = cadena_final.rstrip("&")
-            
-            if len(cadena_final) > 16000:  # Total limit
-                messagebox.showerror("Error", "Comando completo es demasiado largo")
-                return False
-                
-            if cadena_final:
-                print(f"Cadena a enviar: {cadena_final}")
-                if self.master_panel.enviar_comando_serial(cadena_final):
-                    messagebox.showinfo("Éxito", "Comando enviado correctamente")
-                    return True
-                else:
-                    messagebox.showerror("Error", "No se pudo enviar el comando")
-                    return False
-                    
-        except Exception as e:
-            messagebox.showerror("Error", f"Error al enviar comando: {str(e)}")
-            return False
 
     def pausar_proceso(self):
         """Pausa o reanuda el proceso"""
         if self.proceso_en_ejecucion:
-            self.proceso_pausado = not self.proceso_pausado
-            if self.proceso_pausado:
-                self.tiempo_pausa = time.time()
+            if not self.proceso_pausado:
+                self.proceso_pausado = True
                 self.pausar_btn.configure(text="Reanudar Rutina")
                 self.agregar_notificacion("Proceso pausado")
                 
-                # Enviar comando de pausa a ESP32
-                if self.master_panel.enviar_comando_serial("XXXXXXXXXXXXXXXX"):  # Comando de pausa
-                    print("Comando de pausa enviado a ESP32 = XXXXXXXXXXXXXXXX")
-                    self.master_panel.liberar_bloqueo_hardware()
+                # Registrar pausa en la base de datos
+                datos_pausa = {
+                    'proceso_id': self.proceso_id,
+                    'fecha_inicio': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    'fecha_fin': '',
+                    'hora_instruccion': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    'valvula': "Proceso pausado",
+                    'tiempo': 0,
+                    'ciclos': 0,
+                    'estado': 'P',
+                    'fase': self.fase_actual + 1,
+                    'tipo_proceso': 'pausa'
+                }
+                self.guardar_proceso_db(datos_pausa)
             else:
-                self.tiempo_inicio_fase += time.time() - self.tiempo_pausa
+                self.proceso_pausado = False
                 self.pausar_btn.configure(text="Pausar Rutina")
                 self.agregar_notificacion("Proceso reanudado")
                 
-                # Enviar comando de reanudar a ESP32
-                if self.master_panel.verificar_ejecucion("nuevoproceso"):
-                    self.master_panel.activar_bloqueo_hardware("nuevoproceso")
-                    if self.master_panel.enviar_comando_serial("YYYYYYYYYYYYYYYY"): # Comando de reanudar
-                        print("Comando para reanudar enviado a ESP32 = YYYYYYYYYYYYYYYY")
-
-    def paro_emergencia(self):
-        """Detiene todos los procesos y envía señal de emergencia a la ESP32"""
-        # Detener hilo de ejecución
-        if self.proceso_en_ejecucion:
-            self.proceso_en_ejecucion = False
-            if self.hilo_proceso and self.hilo_proceso.is_alive():
-                self.hilo_proceso.join(timeout=1)
-        
-        # Reiniciar campos
-        self.reiniciar_rutina()
-        
-        # Enviar comando de emergencia
-        if self.master_panel.enviar_comando_serial("PPPPPPPPPPPPPPPP"):  # 16 'P'
-            self.master_panel.liberar_bloqueo_hardware()
-            print("Comando de paro de emergencia enviado a ESP32 = PPPPPPPPPPPPPPPP")
-        else:
-            self.agregar_notificacion("No hay conexión serial para enviar señal de emergencia")
-
-        # Actualizar UI
-        self.pausar_btn.configure(state="disabled", text="Pausar Rutina")
-        self.ejecutar_btn.configure(state="normal")
-
-        # Reiniciar contadores visuales
-        for fase, valvulas in self.fases_datos.items():
-            for valvula in valvulas:
-                valvula['progreso'].configure(text="0/0")
-                valvula['ciclos_completados'] = 0
-
-        # Notificación emergente
-        messagebox.showwarning("‼ PARO DE EMERGENCIA ‼", "Todos los procesos han sido detenidos por seguridad")
-        self.agregar_notificacion("🛑 ¡PARO DE EMERGENCIA ACTIVADO! Todos los procesos detenidos")
+                # Registrar reanudación en la base de datos
+                datos_reanudacion = {
+                    'proceso_id': self.proceso_id,
+                    'fecha_inicio': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    'fecha_fin': '',
+                    'hora_instruccion': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    'valvula': "Proceso reanudado",
+                    'tiempo': 0,
+                    'ciclos': 0,
+                    'estado': 'R',
+                    'fase': self.fase_actual + 1,
+                    'tipo_proceso': 'reanudacion'
+                }
+                self.guardar_proceso_db(datos_reanudacion)
 
     def reiniciar_rutina(self):
-        """Reinicia completamente la rutina"""
-        if self.proceso_en_ejecucion:
-            self.proceso_en_ejecucion = False
-            if self.hilo_proceso and self.hilo_proceso.is_alive():
-                self.hilo_proceso.join(timeout=1)
+        """Reinicia la rutina actual"""
+        if messagebox.askyesno("Confirmar", "¿Está seguro de que desea reiniciar la rutina? Se perderán todos los datos configurados."):
+            # Limpiar todas las fases excepto la primera
+            for nombre_fase in list(self.fases_datos.keys())[1:]:
+                self.tabview.delete(nombre_fase)
+                del self.fases_datos[nombre_fase]
             
-            # Enviar comando de detener a ESP32
-            if self.master_panel.enviar_comando_serial("PPPPPPPPPPPPPPPP"):
-                self.agregar_notificacion("Proceso detenido")
-                self.master_panel.liberar_bloqueo_hardware()
-        
-        self.proceso_pausado = False
-        self.pausar_btn.configure(text="Pausar Rutina", state="disabled")
-        self.ejecutar_btn.configure(state="normal")
-        
-        # Reiniciar contadores y estados
-        for fase, valvulas in self.fases_datos.items():
-            for valvula in valvulas:
+            # Reiniciar contador de fases
+            self.fase_contador = 1
+            
+            # Limpiar datos de la primera fase
+            primera_fase = list(self.fases_datos.keys())[0]
+            for valvula in self.fases_datos[primera_fase]:
+                valvula['switch'].deselect()
+                valvula['apertura'].delete(0, "end")
+                valvula['cierre'].delete(0, "end")
+                valvula['ciclos'].delete(0, "end")
                 valvula['progreso'].configure(text="0/0")
-                valvula['ciclos_completados'] = 0
-        
-        # Eliminar fases adicionales
-        for nombre_fase in list(self.fases_datos.keys())[1:]:
-            self.tabview.delete(nombre_fase)
-            del self.fases_datos[nombre_fase]
+            
+            # Limpiar notificaciones
+            self.limpiar_notificaciones()
+            
+            # Resetear controles de proceso
+            self.proceso_en_ejecucion = False
+            self.proceso_pausado = False
+            self.pausar_btn.configure(state="disabled", text="Pausar Rutina")
+            self.ejecutar_btn.configure(state="normal")
+            
+            self.agregar_notificacion("Rutina reiniciada")
+            
+            # Actualizar lista de fases en control manual
+            self.actualizar_lista_fases()
 
-        self.fase_contador = 1
-        self.fase_actual = 0
-        self.repeticiones_spinbox.delete(0, "end")
-        self.repeticiones_spinbox.insert(0, "1")
+    def paro_emergencia(self):
+        """Paro de emergencia - detiene inmediatamente todo el proceso"""
+        if messagebox.askyesno("PARO DE EMERGENCIA", 
+                              "¿ESTÁ SEGURO DE EJECUTAR PARO DE EMERGENCIA?\n\nEsta acción detendrá inmediatamente todos los procesos en ejecución."):
+            
+            # Enviar comando de paro de emergencia a ESP32
+            self.master_panel.enviar_comando_serial("STOPEMERGENCIA")
+            
+            # Detener proceso actual
+            self.proceso_en_ejecucion = False
+            self.proceso_pausado = False
+            self.pausar_btn.configure(state="disabled", text="Pausar Rutina")
+            self.ejecutar_btn.configure(state="normal")
+            
+            # Registrar paro de emergencia en la base de datos
+            datos_paro = {
+                'proceso_id': self.proceso_id if hasattr(self, 'proceso_id') else "emergencia",
+                'fecha_inicio': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                'fecha_fin': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                'hora_instruccion': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                'valvula': "PARO DE EMERGENCIA EJECUTADO",
+                'tiempo': 0,
+                'ciclos': 0,
+                'estado': 'E',
+                'fase': self.fase_actual + 1 if hasattr(self, 'fase_actual') else 0,
+                'tipo_proceso': 'emergencia'
+            }
+            self.guardar_proceso_db(datos_paro)
+            
+            self.agregar_notificacion("PARO DE EMERGENCIA EJECUTADO - Todos los procesos detenidos")
+            messagebox.showinfo("PARO DE EMERGENCIA", "Paro de emergencia ejecutado correctamente")
 
-        # Reset de la primera fase
-        primera_fase = list(self.fases_datos.keys())[0]
-        for valvula in self.fases_datos[primera_fase]:
-            valvula['switch'].deselect()
-            valvula['apertura'].delete(0, "end")
-            valvula['cierre'].delete(0, "end")
-            valvula['ciclos'].delete(0, "end")
-            valvula['progreso'].configure(text="0/0")
-            valvula['ciclos_completados'] = 0
-            # Deshabilitar campos
-            self.toggle_campos_valvula(valvula['switch'], [
-                valvula['apertura'], valvula['apertura_unidad'],
-                valvula['cierre'], valvula['cierre_unidad'],
-                valvula['ciclos']
-            ])
-        
-        # Actualizar lista de fases en control manual
-        self.actualizar_lista_fases()
-        
-        # Liberar bloqueo
-        self.master_panel.liberar_bloqueo_hardware()
-
-    def guardar_proceso_db(self, datos_proceso):
-        """Guarda los datos del proceso en la base de datos"""
-        conn = None
+    def enviar_cadena_serial(self, repeticiones):
+        """Envía la cadena de configuración completa a la ESP32"""
         try:
-            conn = sqlite3.connect("procesos.db")
+            # Construir cadena completa
+            cadena_completa = ""
+            
+            for repeticion in range(repeticiones):
+                for fase_idx, (nombre_fase, valvulas) in enumerate(self.fases_datos.items()):
+                    for valvula_idx, valvula in enumerate(valvulas):
+                        if valvula['switch'].get():
+                            try:
+                                tiempo = self.convertir_a_segundos(valvula['apertura'].get(), valvula['apertura_unidad'].get())
+                                ciclos = int(valvula['ciclos'].get()) if valvula['ciclos'].get() else 0
+                                
+                                if tiempo > 0:
+                                    # Formato: M#A/DNTTTTTTTTTTTT (13 dígitos para tiempo)
+                                    motor = f"M{valvula_idx + 1}"
+                                    tiempo_str = str(tiempo).zfill(8)  # 8 dígitos para tiempo (hasta 99999999 segundos)
+                                    ciclos_str = str(ciclos).zfill(3)  # 3 dígitos para ciclos
+                                    
+                                    comando = f"{motor}A{'D'}N{tiempo_str}{ciclos_str}"
+                                    cadena_completa += comando + "|"
+                            except:
+                                pass
+            
+            if cadena_completa:
+                # Quitar el último pipe
+                cadena_completa = cadena_completa[:-1]
+                
+                # Enviar comando a ESP32
+                if self.master_panel.enviar_comando_serial(cadena_completa):
+                    self.agregar_notificacion(f"Cadena enviada a ESP32: {cadena_completa}")
+                    return True
+                else:
+                    messagebox.showerror("Error", "No se pudo enviar la configuración a la ESP32")
+                    return False
+            else:
+                messagebox.showwarning("Advertencia", "No hay válvulas configuradas para enviar")
+                return False
+                
+        except Exception as e:
+            messagebox.showerror("Error", f"Error al construir cadena serial: {str(e)}")
+            return False
+
+    def guardar_proceso_db(self, datos):
+        """Guarda los datos del proceso en la base de datos"""
+        try:
+            conn = sqlite3.connect('valvulas.db')
             cursor = conn.cursor()
             
-            # Verificar si la tabla existe
-            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='procesos'")
-            if not cursor.fetchone():
-                # Crear tabla nueva con todas las columnas
-                cursor.execute('''CREATE TABLE procesos (
-                            id INTEGER PRIMARY KEY AUTOINCREMENT,
-                            user_id INTEGER,
-                            proceso_id TEXT,
-                            fecha_inicio TEXT,
-                            fecha_fin TEXT,
-                            hora_instruccion TEXT,
-                            valvula_activada TEXT,
-                            tiempo_valvula INTEGER,
-                            ciclos INTEGER,
-                            estado_valvula TEXT,
-                            fase INTEGER DEFAULT 1,
-                            tipo_proceso TEXT)''')
-                print("Tabla 'procesos' creada con la nueva estructura")
-            else:
-                # Verificar columnas existentes
-                cursor.execute("PRAGMA table_info(procesos)")
-                columnas_existentes = [col[1] for col in cursor.fetchall()]
-                
-                # Añadir columnas faltantes
-                columnas_faltantes = {
-                    'proceso_id': 'TEXT',
-                    'fase': 'INTEGER DEFAULT 1',
-                    'tipo_proceso': 'TEXT'
-                }
-                
-                for columna, tipo in columnas_faltantes.items():
-                    if columna not in columnas_existentes:
-                        try:
-                            cursor.execute(f"ALTER TABLE procesos ADD COLUMN {columna} {tipo}")
-                            print(f"Columna {columna} añadida a la tabla existente")
-                        except sqlite3.OperationalError as e:
-                            print(f"Error al añadir columna {columna}: {e}")
+            cursor.execute('''
+                INSERT INTO procesos (proceso_id, fecha_inicio, fecha_fin, hora_instruccion, 
+                                    valvula, tiempo, ciclos, estado, fase, tipo_proceso, usuario_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                datos['proceso_id'],
+                datos['fecha_inicio'],
+                datos.get('fecha_fin', ''),
+                datos['hora_instruccion'],
+                datos['valvula'],
+                datos['tiempo'],
+                datos['ciclos'],
+                datos['estado'],
+                datos['fase'],
+                datos['tipo_proceso'],
+                self.user_id
+            ))
             
-            tipo_proceso = 'ciclico' if int(datos_proceso.get('ciclos', 0)) > 0 else 'puntual'
-            
-            cursor.execute('''INSERT INTO procesos 
-                        (user_id, proceso_id, fecha_inicio, fecha_fin, hora_instruccion, 
-                            valvula_activada, tiempo_valvula, ciclos, estado_valvula, fase, tipo_proceso)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-                        (self.user_id,
-                        datos_proceso.get('proceso_id', ''),
-                        datos_proceso['fecha_inicio'],
-                        datos_proceso.get('fecha_fin', ''),
-                        datos_proceso['hora_instruccion'],
-                        datos_proceso['valvula'],
-                        datos_proceso['tiempo'],
-                        datos_proceso.get('ciclos', 0),
-                        datos_proceso['estado'],
-                        datos_proceso.get('fase', 1),
-                        tipo_proceso))
             conn.commit()
+            conn.close()
             return True
-        except sqlite3.Error as e:
-            print(f"Error de SQLite al guardar en DB: {e}")
-            return False
         except Exception as e:
-            print(f"Error inesperado al guardar en DB: {e}")
+            print(f"Error al guardar en BD: {str(e)}")
             return False
-        finally:
-            if conn:
-                conn.close()  
+
 
     def __del__(self):
         """Cleanup resources"""
