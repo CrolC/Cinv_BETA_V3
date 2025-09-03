@@ -8,7 +8,7 @@ import time
 from datetime import datetime
 from matplotlib.patches import Rectangle, Patch
 import numpy as np
-
+##check the monitoring graph 
 class FormMonitoreo(ctk.CTkFrame):
     def __init__(self, panel_principal, user_id):
         super().__init__(panel_principal)

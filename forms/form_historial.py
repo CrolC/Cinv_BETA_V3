@@ -7,7 +7,7 @@ from tkinter import ttk
 from fpdf import FPDF
 import os
 
-
+#note:I need to add the register of phases non defined on new process
 
 class FormHistorial(ctk.CTkFrame):
     def __init__(self, panel_principal, user_id):  

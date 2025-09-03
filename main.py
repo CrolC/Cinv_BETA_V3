@@ -1,4 +1,4 @@
-#Iniciar app
+#Iniciar UI
 import ctypes
 import sys
 import os

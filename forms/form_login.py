@@ -6,7 +6,7 @@ import os
 import util.generic as utl
 from forms.form_master import MasterPanel
 
-#AJUSTAR TAMAÑO DE LA VENTANA DE REGISTRO DE USUARIO
+#completo
 
 CODIGO_SEGURIDAD = "u6404c3101"  # Código de seguridad para registrarse
 

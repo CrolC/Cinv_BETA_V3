@@ -3,7 +3,7 @@ import threading
 import time
 from tkinter import messagebox
 import re
-#
+#notes:Maybe I'm going to delete this panel or modify some parts to change the source of information (since is no longer the microncontroller who give the vlues)
 
 class FormDiagnostico(ctk.CTkFrame):
     def __init__(self, panel_principal, user_id):

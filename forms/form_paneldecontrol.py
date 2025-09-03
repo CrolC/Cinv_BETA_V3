@@ -6,7 +6,7 @@ import time
 import sqlite3
 from datetime import datetime, date
 import uuid
-
+##maybe delete this panel (under consideration)
 class FormPaneldeControl(ctk.CTkScrollableFrame):
     def __init__(self, panel_principal, user_id):  
         super().__init__(panel_principal)

@@ -9,7 +9,6 @@ import serial.tools.list_ports
 import tkinter.filedialog as filedialog
 import os 
 from tkinter import messagebox
-#sys.path.append('d:/Python_Proyectos/INTER_C3')
 from forms.form_nuevoproceso import FormNuevoProceso
 from forms.form_paneldecontrol import FormPaneldeControl
 from forms.form_historial import FormHistorial
@@ -21,7 +20,7 @@ COLOR_MENU_LATERAL = "#1f3334"
 COLOR_CUERPO_PRINCIPAL = "#f4f8f7"
 COLOR_MENU_CURSOR_ENCIMA = "#18a9b1"
 
-
+##Probably delete the diagnostic and control panel forms (Under consideration)
 class MasterPanel(ctk.CTk):
     def __init__(self, user_id):
         super().__init__()

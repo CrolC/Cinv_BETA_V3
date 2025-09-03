@@ -12,7 +12,6 @@ import uuid
 ##Agregar rutina de tiempo indefinido 
 ##Aumentar a 5 cifras en seg y a 1000 fases
 ##Agregar sonidos en eventos importantes
-##EN MONITOREO: Modificar gráfica
 
 COLOR_CUERPO_PRINCIPAL = "#f4f8f7"
 
