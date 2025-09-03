@@ -8,10 +8,7 @@ from tkinter import messagebox
 import datetime
 import uuid
 
-#PENDIENTES: 
-##Agregar rutina de tiempo indefinido 
-##Aumentar a 5 cifras en seg y a 1000 fases
-##Agregar sonidos en eventos importantes
+#PENDIENTES: ##Agregar rutina de tiempo indefinido ##Aumentar a 5 cifras en seg y a 1000 fases ##Agregar sonidos en eventos importantes
 
 COLOR_CUERPO_PRINCIPAL = "#f4f8f7"
 
@@ -55,7 +52,7 @@ class FormNuevoProceso(ctk.CTkFrame):
         ctk.CTkLabel(self.repeticion_frame, text="Repetir configuración:").pack(side="left", padx=5)
         
         self.repeticiones_spinbox = ctk.CTkEntry(self.repeticion_frame, width=50, validate="key", 
-                                               validatecommand=(self.validar_cmd, "%P"))
+                                            validatecommand=(self.validar_cmd, "%P"))
         self.repeticiones_spinbox.pack(side="left", padx=5)
         self.repeticiones_spinbox.insert(0, "1")  # Valor por defecto
         
@@ -68,8 +65,6 @@ class FormNuevoProceso(ctk.CTkFrame):
         self.tabview = ctk.CTkTabview(self.scrollable_frame)
         self.tabview.pack(fill="both", expand=True, padx=10, pady=10)
         
-        self.agregar_fase("Fase 1")
-
         # Frame para botones generales (altura fija)
         self.botones_generales_frame = ctk.CTkFrame(self.top_frame, height=50)
         self.botones_generales_frame.pack(fill="x", padx=10, pady=(5, 5))
@@ -99,6 +94,67 @@ class FormNuevoProceso(ctk.CTkFrame):
             command=self.iniciar_proceso
         )
         self.ejecutar_btn.pack(side="right", padx=5)
+
+        # Frame para Control Manual de Válvulas
+        self.frame_manual = ctk.CTkFrame(self.top_frame, height=100)
+        self.frame_manual.pack(fill="x", padx=10, pady=(0, 10))
+
+        ctk.CTkLabel(
+            self.frame_manual, 
+            text="CONTROL MANUAL DE VÁLVULAS",
+            font=("Arial", 14, "bold")
+        ).pack(pady=(5, 0))
+
+        # Frame para selección de fase y válvula
+        self.control_frame = ctk.CTkFrame(self.frame_manual, fg_color="transparent")
+        self.control_frame.pack(fill="x", padx=5, pady=5)
+
+        # Selección de fase
+        ctk.CTkLabel(self.control_frame, text="Fase:").grid(row=0, column=0, padx=5, pady=5, sticky="w")
+        self.fase_manual = ctk.CTkOptionMenu(self.control_frame, values=["1"])
+        self.fase_manual.grid(row=0, column=1, padx=5, pady=5, sticky="w")
+
+        # Selección de válvula
+        ctk.CTkLabel(self.control_frame, text="Válvula:").grid(row=0, column=2, padx=5, pady=5, sticky="w")
+        self.valvula_manual = ctk.CTkOptionMenu(self.control_frame, values=self.elementos)
+        self.valvula_manual.grid(row=0, column=3, padx=5, pady=5, sticky="w")
+
+        # Botones de control
+        self.btn_abrir_manual = ctk.CTkButton(
+            self.control_frame, 
+            text="Abrir Válvula", 
+            fg_color="#28a745",
+            command=lambda: self.control_manual_valvula("abrir")
+        )
+        self.btn_abrir_manual.grid(row=0, column=4, padx=5, pady=5)
+
+        self.btn_cerrar_manual = ctk.CTkButton(
+            self.control_frame, 
+            text="Cerrar Válvula", 
+            fg_color="#dc3545",
+            command=lambda: self.control_manual_valvula("cerrar")
+        )
+        self.btn_cerrar_manual.grid(row=0, column=5, padx=5, pady=5)
+
+        # Frame para rango de fases
+        self.rango_frame = ctk.CTkFrame(self.frame_manual, fg_color="transparent")
+        self.rango_frame.pack(fill="x", padx=5, pady=5)
+
+        ctk.CTkLabel(self.rango_frame, text="Abrir desde fase:").grid(row=0, column=0, padx=5, pady=5, sticky="w")
+        self.fase_inicio = ctk.CTkEntry(self.rango_frame, width=50, validate="key", validatecommand=(self.validar_cmd, "%P"))
+        self.fase_inicio.grid(row=0, column=1, padx=5, pady=5, sticky="w")
+
+        ctk.CTkLabel(self.rango_frame, text="hasta fase:").grid(row=0, column=2, padx=5, pady=5, sticky="w")
+        self.fase_fin = ctk.CTkEntry(self.rango_frame, width=50, validate="key", validatecommand=(self.validar_cmd, "%P"))
+        self.fase_fin.grid(row=0, column=3, padx=5, pady=5, sticky="w")
+
+        self.btn_programar_rango = ctk.CTkButton(
+            self.rango_frame, 
+            text="Programar Rango", 
+            fg_color="#007bff",
+            command=self.programar_rango_fases
+        )
+        self.btn_programar_rango.grid(row=0, column=4, padx=5, pady=5)
 
         # Frame para notificaciones (altura fija)
         self.notificaciones_frame = ctk.CTkFrame(self.top_frame, height=150)
@@ -133,7 +189,128 @@ class FormNuevoProceso(ctk.CTkFrame):
                                 hover_color="darkred",
                                 command=self.paro_emergencia)
         btn_paro.pack(side="right", padx=5, pady=(0,5))
+        
+        # AHORA agregamos la fase inicial después de que todos los controles estén creados
+        self.agregar_fase("Fase 1")
+        
+        # Inicializar lista de fases
+        self.actualizar_lista_fases()
+        
         self.pack(padx=10, pady=10, fill="both", expand=True)
+
+    def actualizar_lista_fases(self):
+        """Actualiza la lista de fases disponibles en el control manual"""
+        fases = list(self.fases_datos.keys())
+        numeros_fases = [f.split()[-1] for f in fases]
+        self.fase_manual.configure(values=numeros_fases)
+        if numeros_fases:
+            self.fase_manual.set(numeros_fases[0])
+
+    def control_manual_valvula(self, accion):
+        """Control manual de apertura/cierre de válvulas"""
+        try:
+            if not self.master_panel.verificar_ejecucion("nuevoproceso"):
+                return
+                
+            fase_seleccionada = self.fase_manual.get()
+            valvula_seleccionada = self.valvula_manual.get()
+            
+            if not fase_seleccionada or not valvula_seleccionada:
+                messagebox.showwarning("Advertencia", "Seleccione una fase y una válvula")
+                return
+                
+            # Encontrar el índice de la válvula
+            idx_valvula = self.elementos.index(valvula_seleccionada)
+            
+            # Construir comando para ESP32
+            motor = f"M{idx_valvula + 1}"
+            
+            if accion == "abrir":
+                comando = f"{motor}A{'D'}N000000000000"  # Abrir válvula
+                estado = "A"
+                mensaje = f"Válvula {valvula_seleccionada} abierta manualmente en fase {fase_seleccionada}"
+            else:
+                comando = f"{motor}E{'D'}N000000000000"  # Cerrar válvula
+                estado = "C"
+                mensaje = f"Válvula {valvula_seleccionada} cerrada manualmente en fase {fase_seleccionada}"
+            
+            # Enviar comando
+            if self.master_panel.enviar_comando_serial(comando):
+                # Registrar en base de datos
+                fecha_actual = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                datos = {
+                    'proceso_id': self.proceso_id if hasattr(self, 'proceso_id') else "manual",
+                    'fecha_inicio': fecha_actual,
+                    'fecha_fin': fecha_actual if accion == "cerrar" else '',
+                    'hora_instruccion': fecha_actual,
+                    'valvula': f"Válvula {valvula_seleccionada}",
+                    'tiempo': 0,
+                    'ciclos': 0,
+                    'estado': estado,
+                    'fase': int(fase_seleccionada),
+                    'tipo_proceso': 'manual'
+                }
+                self.guardar_proceso_db(datos)
+                
+                self.agregar_notificacion(mensaje)
+            else:
+                messagebox.showerror("Error", "No se pudo enviar el comando a la ESP32")
+                
+        except Exception as e:
+            messagebox.showerror("Error", f"Error en control manual: {str(e)}")
+
+    def programar_rango_fases(self):
+        """Programa la apertura de una válvula en un rango de fases"""
+        try:
+            fase_inicio = self.fase_inicio.get()
+            fase_fin = self.fase_fin.get()
+            valvula_seleccionada = self.valvula_manual.get()
+            
+            if not all([fase_inicio, fase_fin, valvula_seleccionada]):
+                messagebox.showwarning("Advertencia", "Complete todos los campos del rango de fases")
+                return
+                
+            fase_inicio = int(fase_inicio)
+            fase_fin = int(fase_fin)
+            
+            if fase_inicio > fase_fin:
+                messagebox.showwarning("Advertencia", "La fase inicial no puede ser mayor que la fase final")
+                return
+                
+            # Encontrar el índice de la válvula
+            idx_valvula = self.elementos.index(valvula_seleccionada)
+            
+            # Construir comando para ESP32 con rango de fases
+            motor = f"M{idx_valvula + 1}"
+            comando = f"{motor}RD{str(fase_inicio).zfill(2)}{str(fase_fin).zfill(2)}00000000"
+            
+            # Enviar comando
+            if self.master_panel.enviar_comando_serial(comando):
+                # Registrar en base de datos
+                fecha_actual = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                datos = {
+                    'proceso_id': self.proceso_id if hasattr(self, 'proceso_id') else "rango_manual",
+                    'fecha_inicio': fecha_actual,
+                    'fecha_fin': '',
+                    'hora_instruccion': fecha_actual,
+                    'valvula': f"Válvula {valvula_seleccionada} (Fases {fase_inicio}-{fase_fin})",
+                    'tiempo': 0,
+                    'ciclos': 0,
+                    'estado': 'A',
+                    'fase': fase_inicio,
+                    'tipo_proceso': 'rango_manual'
+                }
+                self.guardar_proceso_db(datos)
+                
+                mensaje = f"Válvula {valvula_seleccionada} programada para abrir desde fase {fase_inicio} hasta fase {fase_fin}"
+                self.agregar_notificacion(mensaje)
+            else:
+                messagebox.showerror("Error", "No se pudo enviar el comando a la ESP32")
+                
+        except ValueError:
+            messagebox.showwarning("Advertencia", "Ingrese números válidos para las fases")
+        except Exception as e:
+            messagebox.showerror("Error", f"Error al programar rango: {str(e)}")
 
     def agregar_notificacion(self, mensaje):
         """Agrega una notificación al panel de notificaciones"""
@@ -310,6 +487,9 @@ class FormNuevoProceso(ctk.CTkFrame):
                     command=lambda: self.eliminar_fase(nombre_fase)).pack(side="right", padx=5)
 
         self.tabview.set(nombre_fase)
+        
+        # Actualizar lista de fases en control manual
+        self.actualizar_lista_fases()
 
     def eliminar_fase(self, nombre_fase):
         """Elimina una fase si no es la última"""
@@ -317,6 +497,9 @@ class FormNuevoProceso(ctk.CTkFrame):
             self.tabview.delete(nombre_fase)
             del self.fases_datos[nombre_fase]
             self.agregar_notificacion(f"Fase {nombre_fase} eliminada")
+            
+            # Actualizar lista de fases en control manual
+            self.actualizar_lista_fases()
         else:
             messagebox.showwarning("Advertencia", "No puedes eliminar la última fase")
             self.agregar_notificacion("Intento de eliminar la última fase (no permitido)")
@@ -907,6 +1090,9 @@ class FormNuevoProceso(ctk.CTkFrame):
                 valvula['ciclos']
             ])
         
+        # Actualizar lista de fases en control manual
+        self.actualizar_lista_fases()
+        
         # Liberar bloqueo
         self.master_panel.liberar_bloqueo_hardware()
 
@@ -990,7 +1176,7 @@ class FormNuevoProceso(ctk.CTkFrame):
             self.stop_event.set()
             
             # Stop execution thread
-            if hasattr(self, 'hilo_proceso') and self.hilo_proceso and self.hilo_proceso.is_alive():
+            if hasattr(self, 'hilo_proceso') and self.hilo_proceso is not None and self.hilo_proceso.is_alive():
                 self.hilo_proceso.join(timeout=1)
             
             # Release hardware lock
