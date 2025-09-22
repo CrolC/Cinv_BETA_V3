@@ -13,7 +13,7 @@ from forms.form_nuevoproceso import FormNuevoProceso
 from forms.form_paneldecontrol import FormPaneldeControl
 from forms.form_historial import FormHistorial
 from forms.form_monitoreo import FormMonitoreo
-from forms.form_diagnostico import FormDiagnostico
+#from forms.form_diagnostico import FormDiagnostico
 
 COLOR_BARRA_SUPERIOR = "#1a1e23"
 COLOR_MENU_LATERAL = "#1f3334"
@@ -220,7 +220,7 @@ class MasterPanel(ctk.CTk):
         buttons_info = [
             ("nuevoproceso", "Nuevo proceso", "\uf144", self.abrir_nuevoproceso),  
             ("historial", "Historial", "\uf07c", self.abrir_historial), 
-            ("diagnostico", "Diagnóstico", "\uf044", self.abrir_diagnostico), 
+            #("diagnostico", "Diagnóstico", "\uf044", self.abrir_diagnostico), 
             ("paneldecontrol", "Panel de Control", "\uf080", self.abrir_paneldecontrol), 
             ("monitoreo", "Monitoreo del Proceso", "\uf017", self.abrir_monitoreo) 
         ]
@@ -276,8 +276,8 @@ class MasterPanel(ctk.CTk):
             self.abrir_nuevoproceso()
         elif boton_key == "historial":
             self.abrir_historial()
-        elif boton_key == "diagnostico":
-            self.abrir_diagnostico()
+        #elif boton_key == "diagnostico":
+            #self.abrir_diagnostico()
         elif boton_key == "paneldecontrol":
             self.abrir_paneldecontrol()
         elif boton_key == "monitoreo":
@@ -313,8 +313,8 @@ class MasterPanel(ctk.CTk):
                 panel = FormPaneldeControl(self.cuerpo_principal, self.user_id)
             elif nombre == "historial":
                 panel = FormHistorial(self.cuerpo_principal, self.user_id)
-            elif nombre == "diagnostico":
-                panel = FormDiagnostico(self.cuerpo_principal, self.user_id)
+            #elif nombre == "diagnostico":
+            #    panel = FormDiagnostico(self.cuerpo_principal, self.user_id)
             elif nombre == "monitoreo":
                 panel = FormMonitoreo(self.cuerpo_principal, self.user_id)
             else:
@@ -340,8 +340,8 @@ class MasterPanel(ctk.CTk):
     def abrir_historial(self):
         self.mostrar_panel("historial")
         
-    def abrir_diagnostico(self):
-        self.mostrar_panel("diagnostico")
+    #def abrir_diagnostico(self):
+    #    self.mostrar_panel("diagnostico")
         
     def abrir_monitoreo(self):
         self.mostrar_panel("monitoreo")
