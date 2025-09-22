@@ -36,6 +36,10 @@ class FormNuevoProceso(ctk.CTkFrame):
         self.elementos = ["Al", "As", "Ga", "In", "N", "Mn", "Be", "Mg", "Si"]
         self.stop_event = threading.Event()
         
+        # Variables para archivo TXT
+        self.archivo_txt_diario = None
+        self.fecha_actual_txt = None
+        
         # Input validation
         self.validar_cmd = self.register(self.validar_entrada)
         self.construir_interfaz()
@@ -135,6 +139,64 @@ class FormNuevoProceso(ctk.CTkFrame):
                                 command=self.paro_emergencia)
         btn_paro.pack(side="right", padx=5, pady=(0,5))
         self.pack(padx=10, pady=10, fill="both", expand=True)
+
+    def inicializar_archivo_txt_diario(self):
+        """Inicializa o verifica el archivo TXT para el día actual"""
+        try:
+            fecha_hoy = datetime.datetime.now().strftime("%Y%m%d")
+            
+            # Si ya tenemos un archivo abierto para hoy, lo usamos
+            if self.archivo_txt_diario and self.fecha_actual_txt == fecha_hoy:
+                return True
+                
+            # Si el archivo es de otro día, lo cerramos
+            if self.archivo_txt_diario:
+                self.archivo_txt_diario.close()
+                self.archivo_txt_diario = None
+            
+            # Crear directorio si no existe
+            directorio = "comandos_guardados"
+            if not os.path.exists(directorio):
+                os.makedirs(directorio)
+            
+            # Nombre del archivo para el día actual
+            nombre_archivo = f"comandos_dia_{fecha_hoy}.txt"
+            ruta_archivo = os.path.join(directorio, nombre_archivo)
+            
+            # Abrir archivo en modo append (agregar al final)
+            self.archivo_txt_diario = open(ruta_archivo, 'a', encoding='utf-8')
+            self.fecha_actual_txt = fecha_hoy
+            
+            # Si el archivo está vacío, agregar marca de tiempo inicial
+            if os.path.getsize(ruta_archivo) == 0:
+                timestamp_inicio = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                self.archivo_txt_diario.write(f"=== INICIO DE REGISTRO - {timestamp_inicio} ===\n")
+                self.archivo_txt_diario.flush()
+            
+            return True
+            
+        except Exception as e:
+            print(f"Error al inicializar archivo TXT: {e}")
+            return False
+
+    def guardar_comando_txt(self, comando, tipo="PROCESO"):
+        """Guarda un comando en el archivo TXT del día actual"""
+        try:
+            if not self.inicializar_archivo_txt_diario():
+                return False
+            
+            timestamp = datetime.datetime.now().strftime("%H:%M:%S")
+            linea = f"[{timestamp}] {tipo}: {comando}\n"
+            
+            self.archivo_txt_diario.write(linea)
+            self.archivo_txt_diario.flush()  # Forzar escritura inmediata
+            
+            self.agregar_notificacion(f"Comando guardado en TXT: {tipo}")
+            return True
+            
+        except Exception as e:
+            print(f"Error al guardar comando TXT: {e}")
+            return False
 
     def agregar_notificacion(self, mensaje):
         """Agrega una notificación al panel de notificaciones"""
@@ -322,30 +384,6 @@ class FormNuevoProceso(ctk.CTkFrame):
             messagebox.showwarning("Advertencia", "No puedes eliminar la última fase")
             self.agregar_notificacion("Intento de eliminar la última fase (no permitido)")
 
-    def guardar_cadena_txt(self, cadena_final):
-        """Guarda SOLO la cadena de comandos en un archivo TXT"""
-        try:
-            # Crear directorio si no existe
-            directorio = "comandos_guardados"
-            if not os.path.exists(directorio):
-                os.makedirs(directorio)
-            
-            # Generar nombre de archivo con timestamp
-            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-            nombre_archivo = f"comandos_proceso_{timestamp}.txt"
-            ruta_archivo = os.path.join(directorio, nombre_archivo)
-            
-            # Guardar SOLO la cadena en el archivo
-            with open(ruta_archivo, 'w', encoding='utf-8') as archivo:
-                archivo.write(cadena_final)
-            
-            self.agregar_notificacion(f"Comandos guardados en: {ruta_archivo}")
-            return True
-            
-        except Exception as e:
-            self.agregar_notificacion(f"Error al guardar archivo TXT: {str(e)}")
-            return False
-
     def generar_cadena_comandos(self, repeticiones):
         """Genera la cadena de comandos para guardar en TXT"""
         try:
@@ -473,7 +511,8 @@ class FormNuevoProceso(ctk.CTkFrame):
                 if cadena_final is None:
                     return
                 
-                if not self.guardar_cadena_txt(cadena_final):
+                # Guardar comando de inicio en TXT
+                if not self.guardar_comando_txt(cadena_final, "INICIO_PROCESO"):
                     messagebox.showerror("Error", "No se pudo guardar los comandos en archivo TXT")
                     return
                 
@@ -615,6 +654,10 @@ class FormNuevoProceso(ctk.CTkFrame):
                                     'tipo_proceso': 'complejo'
                                 }
                                 self.guardar_proceso_db(datos_pausa)
+                                
+                                # Guardar comando de pausa en TXT
+                                self.guardar_comando_txt("XXXXXXXXXXXXXXXX", "PAUSA")
+                                
                             time.sleep(0.1)
                         
                         if not self.proceso_en_ejecucion:
@@ -636,6 +679,9 @@ class FormNuevoProceso(ctk.CTkFrame):
                                 'tipo_proceso': 'complejo'
                             }
                             self.guardar_proceso_db(datos_reanudar)
+                            
+                            # Guardar comando de reanudación en TXT
+                            self.guardar_comando_txt("YYYYYYYYYYYYYYYY", "REANUDAR")
                         
                         tiempo_transcurrido_fase = time.time() - self.tiempo_inicio_fase
                         fase_completada = True
@@ -729,6 +775,9 @@ class FormNuevoProceso(ctk.CTkFrame):
                 }
                 self.guardar_proceso_db(datos_fin)
                 
+                # Guardar comando de fin de proceso en TXT
+                self.guardar_comando_txt("FFFFFFFFFFFFFFFF", "FIN_PROCESO")
+                
                 messagebox.showinfo("Éxito", "Proceso completado exitosamente")
         except Exception as e:
             error_msg = f"Error en ejecución: {str(e)}"
@@ -748,10 +797,17 @@ class FormNuevoProceso(ctk.CTkFrame):
                 self.proceso_pausado = True
                 self.pausar_btn.configure(text="Reanudar Rutina")
                 self.agregar_notificacion("Proceso pausado")
+                
+                # Guardar comando de pausa en TXT
+                self.guardar_comando_txt("XXXXXXXXXXXXXXXX", "PAUSA")
+                
             else:
                 self.proceso_pausado = False
                 self.pausar_btn.configure(text="Pausar Rutina")
                 self.agregar_notificacion("Proceso reanudado")
+                
+                # Guardar comando de reanudación en TXT
+                self.guardar_comando_txt("YYYYYYYYYYYYYYYY", "REANUDAR")
 
     def reiniciar_rutina(self):
         """Reinicia la rutina actual"""
@@ -763,6 +819,9 @@ class FormNuevoProceso(ctk.CTkFrame):
             self.ejecutar_btn.configure(state="normal")
             self.pausar_btn.configure(state="disabled", text="Pausar Rutina")
             self.agregar_notificacion("Rutina reiniciada")
+            
+            # Guardar comando de reinicio en TXT
+            self.guardar_comando_txt("RRRRRRRRRRRRRRRR", "REINICIAR")
             
             # Reiniciar progresos
             for nombre_fase, valvulas in self.fases_datos.items():
@@ -778,6 +837,9 @@ class FormNuevoProceso(ctk.CTkFrame):
             self.tiempo_pausa = 0
             self.ejecutar_btn.configure(state="normal")
             self.pausar_btn.configure(state="disabled", text="Pausar Rutina")
+            
+            # Guardar comando de paro de emergencia en TXT
+            self.guardar_comando_txt("PPPPPPPPPPPPPPPP", "PARO_EMERGENCIA")
             
             # Registrar paro de emergencia en la base de datos
             if hasattr(self, 'proceso_id'):
@@ -846,12 +908,18 @@ class FormNuevoProceso(ctk.CTkFrame):
             return False
 
     def __del__(self):
-        """Cleanup resources"""
+        """Cleanup resources - cerrar archivo TXT al destruir"""
         try:
             self.stop_event.set()
             
             # Stop execution thread
             if hasattr(self, 'hilo_proceso') and self.hilo_proceso and self.hilo_proceso.is_alive():
                 self.hilo_proceso.join(timeout=1)
+            
+            # Cerrar archivo TXT si está abierto
+            if self.archivo_txt_diario:
+                self.archivo_txt_diario.close()
+                self.archivo_txt_diario = None
+                
         except Exception as e:
             print(f"Error en limpieza de NuevoProceso: {e}")
