@@ -7,7 +7,6 @@ from tkinter import ttk
 from fpdf import FPDF
 import os
 
-#note:I need to add the register of phases non defined on new process
 
 class FormHistorial(ctk.CTkFrame):
     def __init__(self, panel_principal, user_id):  
@@ -128,6 +127,8 @@ class FormHistorial(ctk.CTkFrame):
         self.treeview.pack(side="left", fill="both", expand=True)
         self.scrollbar.pack(side="right", fill="y")
 
+
+
     def cargar_historial(self):
         """Carga los datos individuales de cada válvula en el historial"""
         try:
@@ -136,8 +137,7 @@ class FormHistorial(ctk.CTkFrame):
             conn = sqlite3.connect("procesos.db")
             cursor = conn.cursor()
             
-            # Consulta para obtener todos los registros individuales de válvulas
-
+            # MODIFICACIÓN: Agrupar por proceso_id (que ahora es por día)
             cursor.execute("""
                 SELECT 
                     substr(fecha_inicio, 1, 10) as fecha_inicio,
@@ -148,7 +148,7 @@ class FormHistorial(ctk.CTkFrame):
                     END as hora_fin,
                     CASE 
                         WHEN valvula_activada LIKE 'Válvula %' THEN 
-                            substr(valvula_activada, 9)  -- Extrae solo el nombre del elemento
+                            substr(valvula_activada, 9)  
                         ELSE valvula_activada
                     END as valvula,
                     tiempo_valvula,
@@ -160,6 +160,7 @@ class FormHistorial(ctk.CTkFrame):
                 WHERE user_id=? 
                 ORDER BY fecha_inicio DESC, hora_instruccion DESC
             """, (self.user_id,))
+        
             
             registros = cursor.fetchall()
             conn.close()
