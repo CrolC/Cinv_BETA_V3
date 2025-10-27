@@ -8,7 +8,7 @@ import time
 from datetime import datetime
 from matplotlib.patches import Rectangle, Patch
 import numpy as np
-##check the monitoring graph 
+
 class FormMonitoreo(ctk.CTkFrame):
     def __init__(self, panel_principal, user_id):
         super().__init__(panel_principal)
@@ -29,8 +29,7 @@ class FormMonitoreo(ctk.CTkFrame):
         # Configurar interfaz
         self._crear_interfaz()
         
-        # Registrar este panel para recibir mensajes seriales
-        self.master_panel.registrar_panel_serial("monitoreo", self)
+        
         
         # Iniciar monitoreo
         self.iniciar_monitoreo()
@@ -465,7 +464,6 @@ class FormMonitoreo(ctk.CTkFrame):
                 self._hilo_monitoreo.join(timeout=1)
             if hasattr(self, 'fig_monitoreo'):
                 plt.close(self.fig_monitoreo)
-            if hasattr(self, 'master_panel') and hasattr(self.master_panel, 'desregistrar_panel_serial'):
-                self.master_panel.desregistrar_panel_serial("monitoreo")
+            
         except Exception as e:
             print(f"Error en limpieza de Monitoreo: {e}")
