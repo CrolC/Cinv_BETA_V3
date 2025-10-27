@@ -9,10 +9,9 @@ import datetime
 import uuid
 import os
 
-#PENDIENTES: 
-##Agregar rutina de tiempo indefinido 
-##Aumentar a 5 cifras en seg y a 1000 fases
-##quitar conexxion serial, bloqueo de hardware y verificacion de ejecucion, guardar en TXT las cadenas que se mandaban por serial
+##################NOTAS#################################
+##FASES INTERNAS:La tarea es definia A para la fase inicial y E para la fase final dentro de la cadena de comandos. 
+##REGISTRO EN TXT DE COMANDOS: Ahora se guarda un archivo TXT diario con los comandos ejecutados.
 
 COLOR_CUERPO_PRINCIPAL = "#f4f8f7"
 
@@ -40,6 +39,9 @@ class FormNuevoProceso(ctk.CTkFrame):
         self.archivo_txt_diario = None
         self.fecha_actual_txt = None
         
+        # Configuraciones entre fases
+        self.configuraciones_interfases = []
+        
         # Input validation
         self.validar_cmd = self.register(self.validar_entrada)
         self.construir_interfaz()
@@ -65,6 +67,63 @@ class FormNuevoProceso(ctk.CTkFrame):
         self.repeticiones_spinbox.insert(0, "1")  # Valor por defecto
         
         ctk.CTkLabel(self.repeticion_frame, text="veces").pack(side="left", padx=5)
+
+        # Frame para configuración avanzada de válvulas entre fases
+        self.configuracion_avanzada_frame = ctk.CTkFrame(self.top_frame)
+        self.configuracion_avanzada_frame.pack(fill="x", padx=10, pady=(5, 5))
+
+        ctk.CTkLabel(self.configuracion_avanzada_frame, 
+                    text="Configuración Avanzada de Válvulas", 
+                    font=ctk.CTkFont(weight="bold")).pack(anchor="w", pady=(5, 0))
+
+        # Frame para controles de apertura/cierre entre fases
+        self.valvulas_interfases_frame = ctk.CTkFrame(self.configuracion_avanzada_frame)
+        self.valvulas_interfases_frame.pack(fill="x", padx=5, pady=5)
+
+        # Controles para configurar válvulas entre fases
+        control_frame = ctk.CTkFrame(self.valvulas_interfases_frame)
+        control_frame.pack(fill="x", pady=2)
+
+        ctk.CTkLabel(control_frame, text="Válvula:", width=80).pack(side="left", padx=5)
+        self.valvula_interfase_var = ctk.StringVar(value=self.elementos[0])
+        self.valvula_interfase_menu = ctk.CTkOptionMenu(control_frame, 
+                                                      values=self.elementos,
+                                                      variable=self.valvula_interfase_var,
+                                                      width=80)
+        self.valvula_interfase_menu.pack(side="left", padx=5)
+
+        ctk.CTkLabel(control_frame, text="Abrir en Fase:", width=80).pack(side="left", padx=5)
+        self.fase_apertura_var = ctk.StringVar(value="1")
+        self.fase_apertura_menu = ctk.CTkOptionMenu(control_frame, 
+                                                  values=["1"],
+                                                  variable=self.fase_apertura_var,
+                                                  width=60)
+        self.fase_apertura_menu.pack(side="left", padx=5)
+
+        ctk.CTkLabel(control_frame, text="Cerrar en Fase:", width=80).pack(side="left", padx=5)
+        self.fase_cierre_var = ctk.StringVar(value="1")
+        self.fase_cierre_menu = ctk.CTkOptionMenu(control_frame, 
+                                                values=["1"],
+                                                variable=self.fase_cierre_var,
+                                                width=60)
+        self.fase_cierre_menu.pack(side="left", padx=5)
+
+        self.agregar_valvula_interfase_btn = ctk.CTkButton(
+            control_frame, 
+            text="Agregar Configuración", 
+            fg_color="#06918A",
+            command=self.agregar_configuracion_interfase,
+            width=150
+        )
+        self.agregar_valvula_interfase_btn.pack(side="left", padx=10)
+
+        # Frame para mostrar configuraciones agregadas
+        self.lista_configuraciones_frame = ctk.CTkFrame(self.valvulas_interfases_frame, height=100)
+        self.lista_configuraciones_frame.pack(fill="x", padx=5, pady=5)
+        self.lista_configuraciones_frame.pack_propagate(False)
+
+        self.configuraciones_text = ctk.CTkTextbox(self.lista_configuraciones_frame, height=80, state="disabled")
+        self.configuraciones_text.pack(fill="both", padx=5, pady=5)
         
         # Scrollable frame para las fases
         self.scrollable_frame = ctk.CTkFrame(self.top_frame)
@@ -139,6 +198,76 @@ class FormNuevoProceso(ctk.CTkFrame):
                                 command=self.paro_emergencia)
         btn_paro.pack(side="right", padx=5, pady=(0,5))
         self.pack(padx=10, pady=10, fill="both", expand=True)
+
+    def actualizar_fases_menus(self):
+        """Actualiza los menús de fases cuando se agregan/eliminan fases"""
+        fases_disponibles = [str(i+1) for i in range(len(self.fases_datos))]
+        
+        # Guardar valores actuales
+        apertura_actual = self.fase_apertura_var.get()
+        cierre_actual = self.fase_cierre_var.get()
+        
+        # Actualizar menús
+        self.fase_apertura_menu.configure(values=fases_disponibles)
+        self.fase_cierre_menu.configure(values=fases_disponibles)
+        
+        # Restaurar valores si aún existen, sino usar el primero
+        if apertura_actual in fases_disponibles:
+            self.fase_apertura_var.set(apertura_actual)
+        elif fases_disponibles:
+            self.fase_apertura_var.set(fases_disponibles[0])
+            
+        if cierre_actual in fases_disponibles:
+            self.fase_cierre_var.set(cierre_actual)
+        elif fases_disponibles:
+            self.fase_cierre_var.set(fases_disponibles[0])
+
+    def agregar_configuracion_interfase(self):
+        """Agrega una configuración de válvula entre fases"""
+        try:
+            valvula = self.valvula_interfase_var.get()
+            fase_apertura = int(self.fase_apertura_var.get())
+            fase_cierre = int(self.fase_cierre_var.get())
+            
+            if fase_apertura >= fase_cierre:
+                messagebox.showwarning("Advertencia", "La fase de cierre debe ser posterior a la fase de apertura")
+                return
+                
+            # Verificar si ya existe configuración para esta válvula
+            for config in self.configuraciones_interfases:
+                if config['valvula'] == valvula:
+                    messagebox.showwarning("Advertencia", f"Ya existe una configuración para la válvula {valvula}")
+                    return
+            
+            configuracion = {
+                'valvula': valvula,
+                'fase_apertura': fase_apertura,
+                'fase_cierre': fase_cierre
+            }
+            
+            self.configuraciones_interfases.append(configuracion)
+            self.actualizar_lista_configuraciones()
+            self.agregar_notificacion(f"Configuración agregada: {valvula} - Abre Fase {fase_apertura}, Cierra Fase {fase_cierre}")
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Error al agregar configuración: {str(e)}")
+
+    def actualizar_lista_configuraciones(self):
+        """Actualiza la lista visual de configuraciones"""
+        self.configuraciones_text.configure(state="normal")
+        self.configuraciones_text.delete("1.0", "end")
+        
+        for config in self.configuraciones_interfases:
+            texto = f"{config['valvula']}: Abre F{config['fase_apertura']} - Cierra F{config['fase_cierre']}\n"
+            self.configuraciones_text.insert("end", texto)
+        
+        self.configuraciones_text.configure(state="disabled")
+
+    def eliminar_configuracion_interfase(self, valvula):
+        """Elimina una configuración de válvula entre fases"""
+        self.configuraciones_interfases = [config for config in self.configuraciones_interfases if config['valvula'] != valvula]
+        self.actualizar_lista_configuraciones()
+        self.agregar_notificacion(f"Configuración eliminada para válvula {valvula}")
 
     def inicializar_archivo_txt_diario(self):
         """Inicializa o verifica el archivo TXT para el día actual"""
@@ -372,6 +501,9 @@ class FormNuevoProceso(ctk.CTkFrame):
         ctk.CTkButton(botones_frame, text="Eliminar Fase", fg_color="#D9534F",
                     command=lambda: self.eliminar_fase(nombre_fase)).pack(side="right", padx=5)
 
+        # Actualizar menús de fases
+        self.actualizar_fases_menus()
+        
         self.tabview.set(nombre_fase)
 
     def eliminar_fase(self, nombre_fase):
@@ -379,6 +511,16 @@ class FormNuevoProceso(ctk.CTkFrame):
         if len(self.tabview._name_list) > 1:
             self.tabview.delete(nombre_fase)
             del self.fases_datos[nombre_fase]
+            
+            # Eliminar configuraciones que hagan referencia a fases eliminadas
+            fase_num = int(nombre_fase.split()[1])
+            self.configuraciones_interfases = [
+                config for config in self.configuraciones_interfases 
+                if config['fase_apertura'] != fase_num and config['fase_cierre'] != fase_num
+            ]
+            
+            self.actualizar_fases_menus()
+            self.actualizar_lista_configuraciones()
             self.agregar_notificacion(f"Fase {nombre_fase} eliminada")
         else:
             messagebox.showwarning("Advertencia", "No puedes eliminar la última fase")
@@ -392,8 +534,42 @@ class FormNuevoProceso(ctk.CTkFrame):
             # Construir comando para cada fase
             for fase_idx, (nombre_fase, valvulas) in enumerate(self.fases_datos.items(), start=1):
                 cadenas = []
+                
+                # Procesar válvulas que se abren en esta fase (configuraciones entre fases)
+                for config in self.configuraciones_interfases:
+                    if config['fase_apertura'] == fase_idx:
+                        # Encontrar el índice de la válvula
+                        valvula_idx = self.elementos.index(config['valvula']) + 1
+                        motor = f"M{valvula_idx}"
+                        # Comando de apertura simple (sin tiempo ni ciclos)
+                        cadena = f"{motor}AN0000000000"
+                        cadenas.append(cadena)
+                        self.agregar_notificacion(f"Válvula {config['valvula']} programada para abrir en Fase {fase_idx}")
+                
+                # Procesar válvulas que se cierran en esta fase (configuraciones entre fases)
+                for config in self.configuraciones_interfases:
+                    if config['fase_cierre'] == fase_idx:
+                        # Encontrar el índice de la válvula
+                        valvula_idx = self.elementos.index(config['valvula']) + 1
+                        motor = f"M{valvula_idx}"
+                        # Comando de cierre
+                        cadena = f"{motor}EN0000000000"
+                        cadenas.append(cadena)
+                        self.agregar_notificacion(f"Válvula {config['valvula']} programada para cerrar en Fase {fase_idx}")
+                
+                # Procesar válvulas normales de la fase
                 for valvula_idx, valvula in enumerate(valvulas, start=1):
                     if valvula['switch'].get():
+                        # Verificar si esta válvula tiene configuración entre fases
+                        tiene_config_interfase = any(
+                            config['valvula'] == valvula['elemento'] 
+                            for config in self.configuraciones_interfases
+                        )
+                        
+                        # Si tiene configuración entre fases, omitirla de la configuración normal
+                        if tiene_config_interfase:
+                            continue
+                        
                         tiempo = self.convertir_a_segundos(
                             valvula['apertura'].get(), 
                             valvula['apertura_unidad'].get()
@@ -475,8 +651,8 @@ class FormNuevoProceso(ctk.CTkFrame):
         """Inicia el proceso de ejecución de rutina"""
         try:
             if not self.proceso_en_ejecucion:
-                # Generar ID de proceso consistente (fecha + hora)
-                self.proceso_id = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                # MODIFICACIÓN: Generar ID de proceso por día (solo fecha)
+                self.proceso_id = datetime.datetime.now().strftime("%Y%m%d")
                 
                 # Obtener número de repeticiones
                 try:
